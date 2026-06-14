@@ -7,7 +7,10 @@ const getProposalsForProject = async (req, res) => {
 };
 
 const submitProposal = async (req, res) => {
-    const { projectId, coverLetter, bidAmount, estimatedDays } = req.body;
+    const projectId = req.body.projectId || req.body.project_id;
+    const coverLetter = req.body.coverLetter || req.body.proposal_text || req.body.cover_letter;
+    const bidAmount = req.body.bidAmount || req.body.bid_amount;
+    const estimatedDays = req.body.estimatedDays || req.body.estimated_days;
     
     const project = await Project.findById(projectId);
     if (!project) {

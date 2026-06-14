@@ -48,7 +48,27 @@ const updateUserProfile = async (req, res) => {
     }
 };
 
+const getFreelancers = async (req, res) => {
+    try {
+        const freelancers = await User.find({ role: 'Freelancer' }).select('-password');
+        res.json(freelancers);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+const getClients = async (req, res) => {
+    try {
+        const clients = await User.find({ role: 'Client' }).select('-password');
+        res.json(clients);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     getUserProfile,
-    updateUserProfile
+    updateUserProfile,
+    getFreelancers,
+    getClients
 };

@@ -15,10 +15,18 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
   }
 });
 
-app.use(cors());
+const corsOptions = {
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 app.use('/api/auth', require('./src/routes/authRoutes'));

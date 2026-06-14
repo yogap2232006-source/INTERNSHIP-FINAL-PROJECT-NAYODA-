@@ -1,159 +1,299 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, MapPin, DollarSign, Clock, Filter } from 'lucide-react';
-import axios from 'axios';
+import { useAuth, api } from '../context/AuthContext';
 
 export default function Projects() {
-  const [searchTerm, setSearchTerm] = useState('');
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  
+  // Modal & Form States
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [clients, setClients] = useState([]);
+  const [selectedClientId, setSelectedClientId] = useState('');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [budget, setBudget] = useState('');
+  const [duration, setDuration] = useState('10');
+  const [deadline, setDeadline] = useState('');
+  const [formError, setFormError] = useState('');
+  const [creating, setCreating] = useState(false);
+
+  const { user } = useAuth();
+  const isFreelancer = user?.role?.toLowerCase() === 'freelancer';
+
+  const loadProjects = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const response = await api.get('/projects');
+      setProjects(response.data || []);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to load projects');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadClients = async () => {
+    try {
+      const response = await api.get('/profile/clients');
+      setClients(response.data || []);
+    } catch (err) {
+      console.error('Failed to load client directory', err);
+    }
+  };
 
   useEffect(() => {
-    const fetchProjects = async () => {
-      try {
-        const res = await axios.get('http://localhost:5000/api/projects');
-        setProjects(res.data);
-        setLoading(false);
-      } catch (err) {
-        setError('Failed to load projects');
-        setLoading(false);
-      }
-    };
-    fetchProjects();
-  }, []);
+    loadProjects();
+    if (isFreelancer) {
+      loadClients();
+    }
+  }, [isFreelancer]);
 
-  const filteredProjects = projects.filter(p => 
-    p.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleCreateProject = async (e) => {
+    e.preventDefault();
+    if (!selectedClientId) {
+      setFormError('Please select a client partner.');
+      return;
+    }
+    setFormError('');
+    setCreating(true);
+
+    try {
+      const payload = {
+        title,
+        description,
+        budget: parseFloat(budget),
+        estimatedDuration: parseInt(duration, 10),
+        client: selectedClientId,
+        deadline: deadline ? new Date(deadline) : undefined,
+      };
+
+      await api.post('/projects', payload);
+      
+      // Reset form & close modal
+      setTitle('');
+      setDescription('');
+      setBudget('');
+      setDuration('10');
+      setDeadline('');
+      setSelectedClientId('');
+      setIsModalOpen(false);
+      
+      // Reload list
+      loadProjects();
+    } catch (err) {
+      setFormError(err.response?.data?.message || err.message || 'Failed to create project');
+    } finally {
+      setCreating(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <nav className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <span className="text-2xl font-bold text-brand-600">SkillSphere</span>
-              <div className="hidden sm:ml-8 sm:flex sm:space-x-8">
-                <Link to="/dashboard" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                  Dashboard
-                </Link>
-                <Link to="/projects" className="border-brand-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                  Find Work
-                </Link>
-              </div>
-            </div>
-            <div className="flex items-center">
-                <Link to="/profile" className="flex items-center ml-2">
-                  <div className="h-8 w-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold border border-brand-200">
-                    A
-                  </div>
-                </Link>
-            </div>
+    <main>
+      <div className="container">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+          <div>
+            <h1>Project Contracts</h1>
+            <p className="text-muted">Manage active marketplace contracts and orchestration workflows.</p>
           </div>
+          {isFreelancer && (
+            <button
+              className="btn btn-primary"
+              onClick={() => setIsModalOpen(true)}
+            >
+              Initiate New Contract
+            </button>
+          )}
         </div>
-      </nav>
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex gap-8">
-        {/* Left Sidebar Filters */}
-        <aside className="w-64 hidden lg:block flex-shrink-0">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 sticky top-24">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Filters</h2>
-              <Filter className="h-5 w-5 text-gray-400" />
-            </div>
-            
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-sm font-medium text-gray-900 mb-2">Category</h3>
-                <div className="space-y-2">
-                  <label className="flex items-center"><input type="checkbox" className="rounded text-brand-600 focus:ring-brand-500" /> <span className="ml-2 text-sm text-gray-600">Web Development</span></label>
-                  <label className="flex items-center"><input type="checkbox" className="rounded text-brand-600 focus:ring-brand-500" /> <span className="ml-2 text-sm text-gray-600">Mobile Apps</span></label>
-                  <label className="flex items-center"><input type="checkbox" className="rounded text-brand-600 focus:ring-brand-500" /> <span className="ml-2 text-sm text-gray-600">Design</span></label>
-                </div>
+        {isModalOpen && (
+          <div
+            id="new-project-modal"
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              background: 'rgba(0,0,0,0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+            }}
+          >
+            <div className="card" style={{ width: '100%', maxWidth: '500px', maxHeight: '95vh', overflowY: 'auto' }}>
+              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h2 style={{ margin: 0 }}>Create Contract</h2>
+                <button 
+                  onClick={() => setIsModalOpen(false)}
+                  style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#9ca3af' }}
+                >
+                  &times;
+                </button>
               </div>
-              
-              <div>
-                <h3 className="text-sm font-medium text-gray-900 mb-2">Budget</h3>
-                <div className="space-y-2">
-                  <label className="flex items-center"><input type="checkbox" className="rounded text-brand-600 focus:ring-brand-500" /> <span className="ml-2 text-sm text-gray-600">Less than $1k</span></label>
-                  <label className="flex items-center"><input type="checkbox" className="rounded text-brand-600 focus:ring-brand-500" /> <span className="ml-2 text-sm text-gray-600">$1k - $5k</span></label>
-                  <label className="flex items-center"><input type="checkbox" className="rounded text-brand-600 focus:ring-brand-500" /> <span className="ml-2 text-sm text-gray-600">$5k+</span></label>
-                </div>
-              </div>
-            </div>
-          </div>
-        </aside>
-
-        {/* Main Content Area */}
-        <div className="flex-1">
-          <div className="mb-6 flex gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input 
-                type="text" 
-                placeholder="Search projects by keywords..." 
-                className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {loading && <div className="text-center py-8 text-gray-500">Loading projects...</div>}
-            {error && <div className="text-center py-8 text-red-500">{error}</div>}
-            {!loading && !error && filteredProjects.length === 0 && (
-              <div className="text-center py-8 text-gray-500">No projects found.</div>
-            )}
-            {filteredProjects.map(project => (
-              <div key={project._id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <Link to={`/projects/${project._id}`} className="text-xl font-bold text-gray-900 hover:text-brand-600 transition">
-                      {project.title}
-                    </Link>
-                    <p className="text-sm text-gray-500 mt-1">Posted recently by {project.client?.name || 'Client'}</p>
-                  </div>
-                </div>
+              <form id="create-project-form" className="card-body" onSubmit={handleCreateProject} style={{ padding: '1rem 0' }}>
                 
-                <p className="text-gray-600 mt-4 text-sm leading-relaxed line-clamp-2">
-                  {project.description}
-                </p>
-                
-                <div className="flex flex-wrap items-center gap-4 mt-5 text-sm text-gray-500">
-                  <div className="flex items-center text-gray-700 font-medium">
-                    <DollarSign className="h-4 w-4 text-brand-600 mr-1" />
-                    Est. Budget: ${project.budget}
-                  </div>
-                  <div className="flex items-center">
-                    <MapPin className="h-4 w-4 mr-1" />
-                    {project.location || 'Remote'}
-                  </div>
-                  <div className="flex items-center">
-                    <Clock className="h-4 w-4 mr-1" />
-                    Long-term
-                  </div>
-                </div>
-
-                <div className="mt-5 pt-5 border-t border-gray-100 flex justify-between items-center">
-                  <div className="flex gap-2">
-                    {project.skillsRequired?.map(skill => (
-                      <span key={skill} className="px-2.5 py-1 rounded-full bg-brand-50 text-brand-700 border border-brand-200 text-xs font-medium">
-                        {skill}
-                      </span>
+                <div className="form-group">
+                  <label htmlFor="client-select">Select Client Partner</label>
+                  <select 
+                    id="client-select" 
+                    value={selectedClientId} 
+                    onChange={(e) => setSelectedClientId(e.target.value)}
+                    required
+                  >
+                    <option value="">-- Select Client --</option>
+                    {clients.map((c) => (
+                      <option key={c._id} value={c._id}>{c.name} ({c.email})</option>
                     ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="title">Contract Title</label>
+                  <input
+                    type="text"
+                    id="title"
+                    name="title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    required
+                    placeholder="e.g. Full Stack E-commerce website"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="description">Initial Baseline Scope</label>
+                  <textarea
+                    id="description"
+                    name="description"
+                    rows="3"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    required
+                    placeholder="Provide a high-level summary of the baseline scope..."
+                  ></textarea>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="budget">Escrow Budget ($)</label>
+                  <input
+                    type="number"
+                    id="budget"
+                    name="budget"
+                    value={budget}
+                    onChange={(e) => setBudget(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="duration">Quoted Duration (Days)</label>
+                  <input
+                    type="number"
+                    id="duration"
+                    name="duration"
+                    value={duration}
+                    onChange={(e) => setDuration(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="deadline">Target Delivery Date (Optional)</label>
+                  <input
+                    type="date"
+                    id="deadline"
+                    name="deadline"
+                    value={deadline}
+                    onChange={(e) => setDeadline(e.target.value)}
+                  />
+                </div>
+
+                {formError && (
+                  <div className="alert alert-error mt-2">
+                    {formError}
                   </div>
-                  <Link to={`/projects/${project._id}`} className="text-sm font-medium text-brand-600 hover:text-brand-700 transition">
-                    View Details &rarr;
+                )}
+              </form>
+              <div className="card-footer">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setIsModalOpen(false);
+                    setFormError('');
+                  }}
+                  disabled={creating}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  form="create-project-form"
+                  className="btn btn-primary"
+                  disabled={creating}
+                >
+                  {creating ? 'Creating...' : 'Create Contract Proposal'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="text-center mt-4">
+            <div className="spinner"></div> Loading contracts...
+          </div>
+        ) : error ? (
+          <div className="alert alert-error mt-4">{error}</div>
+        ) : projects.length === 0 ? (
+          <div className="text-center mt-4" style={{ padding: '3rem 0', background: 'white', borderRadius: '0.5rem', border: '1px dashed #d1d5db' }}>
+            <p className="text-muted">No contracts initiated yet.</p>
+            {isFreelancer ? (
+              <button className="btn btn-primary mt-2" onClick={() => setIsModalOpen(true)}>
+                Create First Contract Proposal
+              </button>
+            ) : (
+              <p className="text-muted" style={{ fontSize: '0.875rem' }}>Go to the Freelancers Directory to notify a freelancer to start a project.</p>
+            )}
+          </div>
+        ) : (
+          <div id="projects-list" className="grid grid-2">
+            {projects.map((project) => (
+              <div className="card" key={project._id} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>{project.title}</h3>
+                  <p className="text-muted" style={{ fontSize: '0.875rem', height: '3rem', overflow: 'hidden' }}>{project.description}</p>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', margin: '1rem 0', fontSize: '0.875rem' }}>
+                    <div>
+                      <strong>Partner:</strong> {isFreelancer ? project.client?.name : project.freelancer?.name}
+                    </div>
+                    <div>
+                      <strong>Budget:</strong> ${project.budget}
+                    </div>
+                    <div>
+                      <strong>Phase:</strong> <span style={{ fontWeight: 600, color: '#2563eb' }}>{project.phase}</span>
+                    </div>
+                    <div>
+                      <strong>Agreed Duration:</strong> {project.negotiatedDuration} Days
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: '1rem', marginTop: '1rem' }}>
+                  <Link to={`/projects/${project._id}/workspace`} className="btn btn-primary btn-block">
+                    Open Workspace
                   </Link>
                 </div>
               </div>
             ))}
           </div>
-        </div>
-      </main>
-    </div>
+        )}
+      </div>
+    </main>
   );
 }

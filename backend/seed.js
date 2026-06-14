@@ -17,25 +17,68 @@ const seedData = async () => {
     await mongoose.connect(process.env.MONGO_URI);
     console.log('MongoDB Connected for Seeding');
 
-    // Create a dummy client user
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash('password123', salt);
+    // Clear existing collections
+    await User.deleteMany({});
+    await Project.deleteMany({});
+    console.log('Database cleared for seeding...');
 
+    // Create clients
     const clientUser = await User.create({
       name: 'TechVision Inc',
       email: 'contact@techvision.com',
-      password: hashedPassword,
+      password: 'password123',
       role: 'Client'
     });
 
     const blockTrustUser = await User.create({
       name: 'BlockTrust',
       email: 'hr@blocktrust.com',
-      password: hashedPassword,
+      password: 'password123',
       role: 'Client'
     });
 
-    console.log('Created dummy clients');
+    // Create Freelancers
+    const freelancerUser = await User.create({
+      name: 'John Dev',
+      email: 'freelancer@test.com',
+      password: 'password123',
+      role: 'Freelancer',
+      profile: {
+        title: 'Full Stack Engineer',
+        bio: 'Specialist in Node.js, React, and MongoDB with 5+ years experience building SaaS applications.',
+        skills: ['React', 'Node.js', 'MongoDB', 'Express', 'Tailwind CSS'],
+        hourlyRate: 50,
+        location: 'Remote, US',
+        phoneNumber: '+1-555-0199',
+        projectDuration: '10'
+      }
+    });
+
+    const designFreelancer = await User.create({
+      name: 'Sophia UI/UX',
+      email: 'sophia@test.com',
+      password: 'password123',
+      role: 'Freelancer',
+      profile: {
+        title: 'Senior UI/UX Designer',
+        bio: 'Creating beautiful, user-centered digital interfaces for web and mobile apps. Figma expert.',
+        skills: ['Figma', 'UI/UX', 'Mobile Design', 'Wireframing'],
+        hourlyRate: 65,
+        location: 'San Francisco, CA',
+        phoneNumber: '+1-555-0188',
+        projectDuration: '7'
+      }
+    });
+
+    // Create Admin
+    await User.create({
+      name: 'System Admin',
+      email: 'admin@test.com',
+      password: 'password123',
+      role: 'Admin'
+    });
+
+    console.log('Created seeded users (Clients, Freelancers, Admin)');
 
     // Create Mock Projects
     const projects = [

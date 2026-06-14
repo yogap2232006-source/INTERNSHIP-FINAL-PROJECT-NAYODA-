@@ -1,73 +1,104 @@
-import { createContext, useState, useEffect } from 'react';
-import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import React, { createContext, useContext, useState, useEffect } from 'react'
+import axios from 'axios'
 
-const AuthContext = createContext();
+const AuthContext = createContext(null)
 
-export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
-    const [token, setToken] = useState(localStorage.getItem('token') || null);
-    const [loading, setLoading] = useState(true);
-    const navigate = useNavigate();
+// API configuration
+const API_BASE = 'http://localhost:5000/api'
 
-    useEffect(() => {
-        if (token) {
-            axios.get('http://localhost:5000/api/profile', {
-                headers: { Authorization: `Bearer ${token}` }
-            })
-            .then(res => {
-                setUser(res.data);
-            })
-            .catch(err => {
-                console.error("Token verification failed", err);
-                logout();
-            })
-            .finally(() => {
-                setLoading(false);
-            });
-        } else {
-            setLoading(false);
-        }
-    }, [token]);
+const api = axios.create({
+  baseURL: API_BASE,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
 
-    const login = async (email, password) => {
-        try {
-            const res = await axios.post('http://localhost:5000/api/auth/login', { email, password });
-            localStorage.setItem('token', res.data.token);
-            setToken(res.data.token);
-            setUser(res.data);
-            navigate('/dashboard');
-            return { success: true };
-        } catch (error) {
-            return { success: false, message: error.response?.data?.message || 'Login failed' };
-        }
-    };
+// Add token to requests
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  },
+  (error) => Promise.reject(error)
+)
 
-    const register = async (userData) => {
-        try {
-            const res = await axios.post('http://localhost:5000/api/auth/register', userData);
-            localStorage.setItem('token', res.data.token);
-            setToken(res.data.token);
-            setUser(res.data);
-            navigate('/dashboard');
-            return { success: true };
-        } catch (error) {
-            return { success: false, message: error.response?.data?.message || 'Registration failed' };
-        }
-    };
+// Handle 401 responses
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+      window.location.hash = '#/login'
+    }
+    return Promise.reject(error)
+  }
+)
 
-    const logout = () => {
-        localStorage.removeItem('token');
-        setToken(null);
-        setUser(null);
-        navigate('/login');
-    };
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null)
+  const [token, setToken] = useState(null)
+  const [loading, setLoading] = useState(true)
 
-    return (
-        <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
-            {children}
-        </AuthContext.Provider>
-    );
-};
+  // Initialize from localStorage
+  useEffect(() => {
+    const savedToken = localStorage.getItem('token')
+    const savedUser = localStorage.getItem('user')
+    if (savedToken && savedUser) {
+      setToken(savedToken)
+      setUser(JSON.parse(savedUser))
+    }
+    setLoading(false)
+  }, [])
 
-export default AuthContext;
+  const login = async (email, password) => {
+    const response = await api.post('/auth/login', { email, password })
+    const { token: newToken, ...userData } = response.data
+    localStorage.setItem('token', newToken)
+    localStorage.setItem('user', JSON.stringify(userData))
+    setToken(newToken)
+    setUser(userData)
+    return userData
+  }
+
+  const register = async (name, email, password, role = 'Freelancer') => {
+    const response = await api.post('/auth/register', {
+      name,
+      email,
+      password,
+      role,
+    })
+    const { token: newToken, ...userData } = response.data
+    localStorage.setItem('token', newToken)
+    localStorage.setItem('user', JSON.stringify(userData))
+    setToken(newToken)
+    setUser(userData)
+    return userData
+  }
+
+  const logout = async () => {
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    setToken(null)
+    setUser(null)
+  }
+
+  return (
+    <AuthContext.Provider value={{ user, setUser, token, login, register, logout, loading }}>
+      {children}
+    </AuthContext.Provider>
+  )
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext)
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider')
+  }
+  return context
+}
+
+export { api }
